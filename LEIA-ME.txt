@@ -1,0 +1,22 @@
+INKLY — DEPLOY VERCEL
+
+ARQUIVOS
+index.html          = chat do cliente
+api/lead.js         = backend que recebe o formulário e envia o e-mail
+package.json        = dependência Nodemailer
+vercel.json         = configuração da função Vercel
+.env.example        = nomes das variáveis privadas (não contém senha)
+
+DEPLOY
+1. Crie um novo projeto na Vercel e envie esta pasta/projeto.
+2. Em Settings > Environment Variables, cadastre:
+   GMAIL_USER
+   GMAIL_APP_PASSWORD
+   LEAD_TO = inklysolutions@gmail.com
+3. Faça o deploy/redeploy.
+4. Abra a URL gerada pela Vercel e teste o fluxo:
+   Falar com um consultor > preencher dados > Encaminhar.
+5. O backend só confirma ao HTML depois que o envio do e-mail conclui.
+
+IMPORTANTE
+Nunca coloque GMAIL_APP_PASSWORD dentro do index.html.
