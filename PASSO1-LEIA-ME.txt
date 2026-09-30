@@ -1,0 +1,19 @@
+PASSO 1 — IA REAL NO AGENTE INKLY
+
+Este pacote preserva o index.html atual de ~6 MB e injeta a camada de IA no momento em que a página é servida.
+
+NO GITHUB:
+1. Substitua api/chat.js
+2. Adicione api/page.js
+3. Adicione ai-override.js na raiz
+4. Substitua vercel.json
+5. NÃO altere api/lead.js
+6. NÃO altere index.html
+
+Depois aguarde o deploy automático da Vercel.
+
+TESTE:
+Digite no campo livre:
+Tenho uma transportadora pequena e os motoristas registram entregas em papel. O que vocês poderiam criar para resolver isso?
+
+Se a Cloudflare falhar, o chat mostrará explicitamente "Não consegui acessar a IA agora..." em vez de cair silenciosamente na lógica antiga.
