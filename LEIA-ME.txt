@@ -1,0 +1,26 @@
+AGENTE INKLY — PACOTE FINAL
+
+ARQUITETURA
+1. index.html -> interface do agente.
+2. /api/chat.js -> Cloudflare Workers AI no plano Free (sem OpenAI e sem Gemini).
+3. /api/lead.js -> envia nome, WhatsApp, e-mail e histórico da conversa para inklysolutions@gmail.com via Gmail SMTP.
+
+VARIÁVEIS NA VERCEL
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_AI_MODEL=@cf/zai-org/glm-4.7-flash
+GMAIL_USER=inklysolutions@gmail.com
+GMAIL_APP_PASSWORD=<senha de app do Google, sem espaços>
+LEAD_TO=inklysolutions@gmail.com
+
+CLOUDFLARE
+No painel da Cloudflare, abra Workers AI > Use REST API e copie o Account ID. Crie um token de Workers AI com permissão de leitura/execução e coloque-o somente nas variáveis da Vercel.
+
+GMAIL
+A conta GMAIL_USER precisa ter verificação em duas etapas e uma Senha de app. A senha de app vai somente na Vercel. O backend só informa sucesso ao navegador depois que o SMTP confirma o envio.
+
+FLUXO
+Conversa -> /api/chat -> Workers AI Free.
+Falar com consultor -> formulário -> /api/lead -> Gmail SMTP -> inklysolutions@gmail.com.
+Se o e-mail falhar, o formulário continua aberto e o agente NÃO afirma que enviou.
+Depois do envio confirmado, a conversa é encerrada.
