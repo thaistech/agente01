@@ -1,0 +1,31 @@
+AGENTE INKLY — PACOTE CORRIGIDO
+
+CORREÇÃO PRINCIPAL DA IA
+O projeto anterior procurava:
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
+
+Mas as variáveis configuradas na Vercel foram:
+CF_ACCOUNT_ID
+CF_API_TOKEN
+
+Por isso a interface existia, mas o backend não encontrava as credenciais.
+Este pacote usa os nomes CF_ACCOUNT_ID e CF_API_TOKEN e mantém compatibilidade
+com os nomes antigos.
+
+MODELO
+Padrão: @cf/zai-org/glm-4.7-flash
+
+FORMULÁRIO / E-MAIL
+Variáveis:
+GMAIL_USER=inklysolutions@gmail.com
+GMAIL_APP_PASSWORD=<senha de app do Google, não a senha normal>
+LEAD_TO=inklysolutions@gmail.com
+
+O envio usa smtp.gmail.com:465 com TLS e faz transporter.verify() antes do envio.
+Se o Gmail rejeitar autenticação, o motivo exato aparecerá nos Logs da função
+/api/lead na Vercel.
+
+DEPLOY
+Substitua os arquivos do repositório pelos arquivos deste pacote e faça novo
+deploy/redeploy de Production sem reaproveitar build cache.
