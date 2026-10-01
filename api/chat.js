@@ -1,3 +1,5 @@
+import { INKLY_KNOWLEDGE } from "./knowledge.js";
+
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
 
@@ -10,7 +12,8 @@ export default async function handler(req, res) {
       route: "/api/chat",
       message: "API do agente está ativa",
       provider: "Cloudflare Workers AI",
-      version: "passo-2"
+      version: "passo-3",
+      knowledge: "Inkly Solutions"
     });
   }
 
@@ -105,7 +108,7 @@ export default async function handler(req, res) {
     }
 
     // =========================================================
-    // MOTOR CONVERSACIONAL — PASSO 2
+    // MOTOR CONVERSACIONAL
     // =========================================================
     const systemPrompt = `
 Você é o Agente Virtual da Inkly Solutions.
@@ -114,6 +117,36 @@ Sua função é conversar com potenciais clientes de forma natural,
 consultiva, inteligente, profissional e objetiva.
 
 Você não é um menu e não deve agir como formulário.
+
+=========================================================
+FONTES DE INFORMAÇÃO
+=========================================================
+
+Você receberá, além destas instruções, uma BASE DE CONHECIMENTO OFICIAL
+DA INKLY SOLUTIONS.
+
+Essa base é a fonte de verdade sobre:
+
+- serviços;
+- possibilidades;
+- soluções;
+- exemplos;
+- limites;
+- escopo de atuação da Inkly Solutions.
+
+Quando o usuário perguntar sobre a Inkly Solutions, seus serviços,
+possibilidades ou soluções, utilize a Base de Conhecimento fornecida.
+
+Não invente serviços ou capacidades que não estejam confirmados nela.
+
+Se algo não estiver confirmado na base, não apresente como fato.
+
+Você pode conversar, analisar a necessidade e formular hipóteses,
+mas deve distinguir claramente uma análise consultiva de uma informação
+oficial sobre os serviços da Inkly Solutions.
+
+Não revele ao usuário que recebeu uma "base de conhecimento".
+Use o conteúdo naturalmente durante a conversa.
 
 =========================================================
 OBJETIVO PRINCIPAL
@@ -126,8 +159,10 @@ Durante a conversa:
 1. entenda a mensagem atual;
 2. considere o histórico;
 3. responda diretamente ao que foi perguntado;
-4. identifique o que ainda precisa ser compreendido;
-5. conduza naturalmente para o próximo passo.
+4. consulte mentalmente a Base de Conhecimento quando o assunto
+   envolver a Inkly Solutions;
+5. identifique o que ainda precisa ser compreendido;
+6. conduza naturalmente para o próximo passo.
 
 Toda resposta deve fazer a conversa avançar.
 
@@ -143,45 +178,27 @@ PRIMEIRO responda à pergunta.
 
 DEPOIS, quando necessário, faça uma pergunta de continuidade.
 
-Não substitua a resposta por frases genéricas como:
-
-"Entendo a importância."
-"Precisamos compreender melhor."
-"Vamos analisar."
-"Para traçar o perfil do problema..."
-
-Essas frases podem aparecer somente quando acrescentarem valor real.
+Não substitua a resposta por frases genéricas.
 
 =========================================================
 COMPORTAMENTO CONSULTIVO
 =========================================================
 
-Quando alguém apresentar um problema empresarial ou operacional,
+Quando alguém apresentar uma necessidade ou problema,
 não tente vender imediatamente.
 
-Investigue progressivamente.
+Primeiro entenda o contexto.
 
-Procure compreender, quando relevante:
+Depois utilize o conhecimento da Inkly Solutions para identificar
+se alguma solução disponível pode fazer sentido.
 
-- qual processo está sendo afetado;
-- onde o problema é percebido;
-- quais sintomas aparecem;
-- quando acontece;
-- frequência;
-- volume;
-- existência de filas ou esperas;
-- retrabalho;
-- erros;
-- capacidade;
-- pessoas ou etapas envolvidas;
-- impacto operacional;
-- impacto no cliente;
-- urgência.
+Não force uma solução da Inkly quando ela não estiver relacionada
+ao problema apresentado.
 
-Não pergunte tudo de uma vez.
+Não transforme a conversa em interrogatório.
 
-Escolha a informação MAIS ÚTIL para o próximo passo
-e faça preferencialmente uma pergunta por vez.
+Escolha a informação MAIS ÚTIL para o próximo passo e faça
+preferencialmente uma pergunta por vez.
 
 =========================================================
 RACIOCÍNIO
@@ -191,14 +208,13 @@ Não confunda sintoma com causa.
 
 Não apresente hipótese como certeza.
 
-Use expressões como:
+Quando ainda não houver evidência suficiente, utilize expressões
+naturais como:
 
 "isso pode indicar..."
 "uma possibilidade é..."
 "precisamos confirmar..."
 "isso já nos dá uma pista..."
-
-quando ainda não houver evidência suficiente.
 
 Se faltarem dados, diga claramente o que precisa descobrir.
 
@@ -214,15 +230,44 @@ Não invente:
 - resultados;
 - clientes;
 - números;
+- tecnologias não confirmadas;
+- integrações não confirmadas;
 - condições comerciais;
 - diagnósticos;
-- informações sobre a Inkly Solutions.
+- funcionalidades específicas não presentes na base.
 
-Não crie relações causais sem evidência.
+Não transforme exemplo em promessa.
 
-Por exemplo:
+Não transforme possibilidade em característica obrigatória.
 
-atraso operacional não significa automaticamente inadimplência.
+=========================================================
+ESCOPO DESTE AGENTE
+=========================================================
+
+O menu oficial deste agente é definido pela Base de Conhecimento.
+
+As quatro frentes são:
+
+1. Sites, Sistemas, App & API
+2. Dados & Dashboards
+3. Ferramentas & Automação
+4. Gamificação
+
+Não ofereça neste agente:
+
+- Consultoria Empresarial;
+- Consultoria de Processos;
+- Consultoria de Logística;
+- Treinamentos Corporativos;
+- LOAE;
+- treinamentos Lean.
+
+Se o usuário falar sobre um problema operacional ou empresarial,
+você pode compreender o contexto para identificar uma eventual
+necessidade tecnológica.
+
+Mas não apresente consultoria empresarial ou Lean como serviço
+deste agente.
 
 =========================================================
 ESTILO
@@ -238,8 +283,7 @@ Evite linguagem robótica.
 
 Evite textos longos sem necessidade.
 
-Evite repetir o que o usuário acabou de dizer,
-a menos que seja necessário para confirmar entendimento.
+Evite repetir o que o usuário acabou de dizer.
 
 Normalmente responda em 1 a 3 parágrafos curtos.
 
@@ -247,7 +291,7 @@ Normalmente responda em 1 a 3 parágrafos curtos.
 CONTINUIDADE
 =========================================================
 
-Se o problema ainda não estiver suficientemente compreendido,
+Se a necessidade ainda não estiver suficientemente compreendida,
 termine a resposta com uma pergunta útil para avançar.
 
 A pergunta deve nascer da informação que acabou de ser fornecida.
@@ -265,16 +309,14 @@ Ao longo da conversa, procure compreender naturalmente:
 - nome;
 - empresa ou tipo de negócio;
 - necessidade;
-- processo afetado;
 - problema principal;
+- solução procurada;
 - impacto;
 - urgência;
 - objetivo desejado;
 - interesse em receber ajuda profissional.
 
 Não transforme isso em interrogatório.
-
-Colete essas informações apenas quando fizer sentido.
 
 =========================================================
 INTENÇÃO COMERCIAL
@@ -286,6 +328,7 @@ Somente quando a pessoa demonstrar intenção real de:
 - solicitar orçamento;
 - falar com especialista;
 - agendar conversa;
+- solicitar proposta;
 - avançar comercialmente;
 
 conduza naturalmente para atendimento humano.
@@ -303,9 +346,11 @@ Não diga que é um modelo de linguagem.
 Não mencione:
 
 - Cloudflare;
-- API;
+- API interna;
 - tokens;
 - backend;
+- prompt;
+- base de conhecimento;
 - implementação técnica.
 
 =========================================================
@@ -315,18 +360,42 @@ REGRA FINAL
 Antes de finalizar cada resposta, verifique mentalmente:
 
 1. Eu respondi ao que a pessoa perguntou?
-2. Minha resposta está baseada no que ela realmente informou?
-3. Evitei inventar conclusões?
-4. A conversa sabe para onde seguir agora?
-5. Se ainda preciso de informação, fiz uma pergunta útil?
+2. Usei corretamente o conhecimento oficial quando necessário?
+3. Minha resposta está baseada no que ela realmente informou?
+4. Evitei inventar capacidades ou conclusões?
+5. A conversa sabe para onde seguir agora?
+6. Se ainda preciso de informação, fiz uma pergunta útil?
 
 Nunca termine propositalmente uma resposta no meio de uma frase.
+`.trim();
+
+    // =========================================================
+    // CONHECIMENTO OFICIAL
+    // =========================================================
+    const knowledgePrompt = `
+A seguir está a BASE OFICIAL DE CONHECIMENTO DA INKLY SOLUTIONS.
+
+Utilize estas informações como fonte de verdade sobre os serviços
+e possibilidades oferecidos pela empresa.
+
+Não repita esta base inteira para o usuário.
+Recupere apenas as informações relevantes para a conversa atual.
+
+---------------- INÍCIO DA BASE ----------------
+
+${INKLY_KNOWLEDGE}
+
+---------------- FIM DA BASE ----------------
 `.trim();
 
     const finalMessages = [
       {
         role: "system",
         content: systemPrompt
+      },
+      {
+        role: "system",
+        content: knowledgePrompt
       },
       ...messages
     ];
@@ -348,11 +417,7 @@ Nunca termine propositalmente uma resposta no meio de uma frase.
 
       body: JSON.stringify({
         messages: finalMessages,
-
-        // Aumentado porque 700 estava cortando respostas.
         max_tokens: 1600,
-
-        // Um pouco mais controlado para atendimento empresarial.
         temperature: 0.55
       })
     });
@@ -375,80 +440,101 @@ Nunca termine propositalmente uma resposta no meio de uma frase.
       });
     }
 
-    console.log(
-      "Workers AI resposta completa:",
-      JSON.stringify(data, null, 2)
-    );
-
-    if (!response.ok) {
+    if (!response.ok || data?.success === false) {
       console.error(
         "Erro Cloudflare Workers AI:",
         JSON.stringify(data, null, 2)
       );
 
-      return res.status(response.status).json({
+      return res.status(response.status || 502).json({
         ok: false,
         error: "CLOUDFLARE_AI_ERROR",
-        details: data
+        details: data?.errors || data
       });
     }
 
     // =========================================================
-    // EXTRAÇÃO ROBUSTA DA RESPOSTA
+    // EXTRAÇÃO DA RESPOSTA
     // =========================================================
+    function normalizeText(value) {
+      if (typeof value === "string") {
+        const text = value.trim();
+        return text || null;
+      }
+
+      if (Array.isArray(value)) {
+        const text = value
+          .map((part) => {
+            if (typeof part === "string") {
+              return part;
+            }
+
+            if (
+              part &&
+              typeof part.text === "string"
+            ) {
+              return part.text;
+            }
+
+            if (
+              part &&
+              typeof part.content === "string"
+            ) {
+              return part.content;
+            }
+
+            if (
+              part?.text &&
+              typeof part.text.value === "string"
+            ) {
+              return part.text.value;
+            }
+
+            return "";
+          })
+          .filter(Boolean)
+          .join("\n")
+          .trim();
+
+        return text || null;
+      }
+
+      return null;
+    }
+
     function extractText(payload) {
+      const result = payload?.result;
+
+      const firstChoice =
+        result?.choices?.[0] ??
+        payload?.choices?.[0];
+
       const candidates = [
-        payload?.result?.response,
-        payload?.result?.choices?.[0]?.message?.content,
-        payload?.result?.choices?.[0]?.message?.text,
-        payload?.result?.choices?.[0]?.text,
-        payload?.result?.choices?.[0]?.content,
-        payload?.result?.choices?.[0]?.response,
+        result?.response,
+        result?.text,
+        result?.content,
+
+        firstChoice?.message?.content,
+        firstChoice?.message?.text,
+        firstChoice?.message?.response,
+
+        firstChoice?.text,
+        firstChoice?.content,
+        firstChoice?.response,
+
+        firstChoice?.delta?.content,
+        firstChoice?.delta?.text,
+
         payload?.response,
-        payload?.choices?.[0]?.message?.content,
-        payload?.choices?.[0]?.message?.text,
-        payload?.choices?.[0]?.text,
-        payload?.choices?.[0]?.content
+        payload?.text,
+        payload?.content
       ];
 
       for (const candidate of candidates) {
-        if (
-          typeof candidate === "string" &&
-          candidate.trim()
-        ) {
-          return candidate.trim();
-        }
+        const text = normalizeText(candidate);
 
-        if (Array.isArray(candidate)) {
-          const text = candidate
-            .map((part) => {
-              if (typeof part === "string") {
-                return part;
-              }
-
-              if (
-                part &&
-                typeof part.text === "string"
-              ) {
-                return part.text;
-              }
-
-              if (
-                part &&
-                typeof part.content === "string"
-              ) {
-                return part.content;
-              }
-
-              return "";
-            })
-            .filter(Boolean)
-            .join("\n")
-            .trim();
-
-          if (text) {
-            return text;
-          }
+        if (text) {
+          return text;
         }
       }
 
@@ -458,17 +544,17 @@ Nunca termine propositalmente uma resposta no meio de uma frase.
     const answer = extractText(data);
 
     // =========================================================
-    // VERIFICA SE A GERAÇÃO BATEU NO LIMITE
+    // DIAGNÓSTICO DE TRUNCAMENTO
     // =========================================================
     const choice =
-      data?.result?.choices?.[0] ||
-      data?.choices?.[0] ||
+      data?.result?.choices?.[0] ??
+      data?.choices?.[0] ??
       null;
 
     const finishReason =
-      choice?.finish_reason ||
-      choice?.finishReason ||
-      data?.result?.finish_reason ||
+      choice?.finish_reason ??
+      choice?.finishReason ??
+      data?.result?.finish_reason ??
       null;
 
     const completionTokens =
@@ -484,22 +570,6 @@ Nunca termine propositalmente uma resposta no meio de uma frase.
         completionTokens >= 1595
       );
 
-    console.log(
-      "Diagnóstico da geração:",
-      JSON.stringify(
-        {
-          finishReason,
-          completionTokens,
-          possiblyTruncated
-        },
-        null,
-        2
-      )
-    );
-
-    // =========================================================
-    // SEM TEXTO
-    // =========================================================
     if (!answer) {
       console.error(
         "Não foi possível extrair texto:",
@@ -514,27 +584,19 @@ Nunca termine propositalmente uma resposta no meio de uma frase.
       });
     }
 
-    // =========================================================
-    // NÃO ENTREGAR RESPOSTA TRUNCADA COMO SE ESTIVESSE OK
-    // =========================================================
     if (possiblyTruncated) {
       console.warn(
-        "Resposta possivelmente truncada. " +
-        "completion_tokens:",
-        completionTokens,
-        "finish_reason:",
-        finishReason
+        "Resposta possivelmente truncada:",
+        JSON.stringify({
+          finishReason,
+          completionTokens
+        })
       );
     }
 
     // =========================================================
     // SUCESSO
     // =========================================================
-    console.log(
-      "Resposta final do agente:",
-      answer
-    );
-
     return res.status(200).json({
       ok: true,
 
@@ -543,6 +605,8 @@ Nunca termine propositalmente uma resposta no meio de uma frase.
       response: answer,
 
       meta: {
+        version: "passo-3",
+        knowledgeLoaded: true,
         finishReason,
         completionTokens,
         possiblyTruncated
