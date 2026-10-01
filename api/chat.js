@@ -82,7 +82,6 @@ export default async function handler(req, res) {
         .slice(-24);
     }
 
-    // Compatibilidade com frontend que manda apenas "message"
     if (
       !messages.length &&
       typeof body.message === "string" &&
@@ -148,7 +147,6 @@ falar com especialista ou avançar comercialmente, conduza naturalmente
 para a próxima etapa do atendimento.
 `.trim();
 
-    // Remove system antigo enviado pelo frontend para não duplicar instruções
     const conversationMessages = messages.filter(
       (item) => item.role !== "system"
     );
@@ -191,8 +189,7 @@ para a próxima etapa do atendimento.
       data = JSON.parse(rawText);
     } catch {
       console.error(
-        "Cloudflare retornou conteúdo não JSON:",
-        rawText
+        "CLOUDFLARE_RAW_TEXT=" + rawText
       );
 
       return res.status(502).json({
@@ -201,16 +198,34 @@ para a próxima etapa do atendimento.
       });
     }
 
-    // Log completo — não transforma objetos internos em [Object]
+    // =========================================================
+    // LOGS DE DIAGNÓSTICO
+    // =========================================================
+
     console.log(
-      "Workers AI resposta completa:",
-      JSON.stringify(data, null, 2)
+      "CLOUDFLARE_RESPONSE=" +
+      JSON.stringify(data)
+    );
+
+    console.log(
+      "RESULT_JSON=" +
+      JSON.stringify(data?.result ?? null)
+    );
+
+    const choice =
+      data?.result?.choices?.[0] ??
+      data?.choices?.[0] ??
+      null;
+
+    console.log(
+      "CHOICE_0_JSON=" +
+      JSON.stringify(choice)
     );
 
     if (!response.ok) {
       console.error(
-        "Erro Cloudflare Workers AI:",
-        JSON.stringify(data, null, 2)
+        "CLOUDFLARE_ERROR=" +
+        JSON.stringify(data)
       );
 
       return res.status(response.status).json({
@@ -221,104 +236,133 @@ para a próxima etapa do atendimento.
     }
 
     // =========================================================
-    // EXTRAÇÃO DA RESPOSTA
+    // FUNÇÕES PARA EXTRAIR TEXTO
     // =========================================================
-    // O glm-4.7-flash está retornando estrutura chat.completion.
-    // Esta função aceita diferentes formatos para não ficarmos
-    // presos a uma única estrutura do provider.
-    // =========================================================
+
+    function normalizeText(value) {
+      if (typeof value === "string") {
+        const text = value.trim();
+        return text || null;
+      }
+
+      if (Array.isArray(value)) {
+        const text = value
+          .map((part) => {
+            if (typeof part === "string") {
+              return part;
+            }
+
+            if (
+              part &&
+              typeof part.text === "string"
+            ) {
+              return part.text;
+            }
+
+            if (
+              part &&
+              typeof part.content === "string"
+            ) {
+              return part.content;
+            }
+
+            if (
+              part?.text &&
+              typeof part.text.value === "string"
+            ) {
+              return part.text.value;
+            }
+
+            return "";
+          })
+          .filter(Boolean)
+          .join("\n")
+          .trim();
+
+        return text || null;
+      }
+
+      return null;
+    }
 
     function extractText(payload) {
+      const result = payload?.result;
+
+      const firstChoice =
+        result?.choices?.[0] ??
+        payload?.choices?.[0];
+
       const candidates = [
-        payload?.result?.response,
+        result?.response,
 
-        payload?.result?.choices?.[0]?.message?.content,
+        result?.text,
 
-        payload?.result?.choices?.[0]?.message?.text,
+        result?.content,
 
-        payload?.result?.choices?.[0]?.text,
+        firstChoice?.message?.content,
 
-        payload?.result?.choices?.[0]?.content,
+        firstChoice?.message?.text,
 
-        payload?.result?.choices?.[0]?.response,
+        firstChoice?.message?.response,
+
+        firstChoice?.text,
+
+        firstChoice?.content,
+
+        firstChoice?.response,
+
+        firstChoice?.delta?.content,
+
+        firstChoice?.delta?.text,
 
         payload?.response,
 
-        payload?.choices?.[0]?.message?.content,
+        payload?.text,
 
-        payload?.choices?.[0]?.message?.text,
-
-        payload?.choices?.[0]?.text,
-
-        payload?.choices?.[0]?.content
+        payload?.content
       ];
 
       for (const candidate of candidates) {
-        if (
-          typeof candidate === "string" &&
-          candidate.trim()
-        ) {
-          return candidate.trim();
-        }
+        const text = normalizeText(candidate);
 
-        // Alguns providers podem devolver content como array
-        if (Array.isArray(candidate)) {
-          const text = candidate
-            .map((part) => {
-              if (typeof part === "string") {
-                return part;
-              }
-
-              if (
-                part &&
-                typeof part.text === "string"
-              ) {
-                return part.text;
-              }
-
-              if (
-                part &&
-                typeof part.content === "string"
-              ) {
-                return part.content;
-              }
-
-              return "";
-            })
-            .filter(Boolean)
-            .join("\n")
-            .trim();
-
-          if (text) {
-            return text;
-          }
+        if (text) {
+          return text;
         }
       }
 
       return null;
     }
 
+    // =========================================================
+    // TENTA EXTRAIR A RESPOSTA
+    // =========================================================
+
     const answer = extractText(data);
 
     // =========================================================
-    // RESPOSTA NÃO ENCONTRADA
+    // SE AINDA NÃO ENCONTRAR, DEVOLVE O FORMATO REAL
     // =========================================================
+
     if (!answer) {
       console.error(
-        "Não foi possível extrair texto da resposta Workers AI:",
-        JSON.stringify(data, null, 2)
+        "TEXT_NOT_FOUND_CHOICE=" +
+        JSON.stringify(choice)
+      );
+
+      console.error(
+        "TEXT_NOT_FOUND_RESULT=" +
+        JSON.stringify(data?.result ?? null)
       );
 
       return res.status(502).json({
         ok: false,
         error: "INVALID_AI_RESPONSE",
         message:
-          "A IA respondeu, mas o conteúdo textual não foi localizado.",
+          "A IA respondeu, mas o conteúdo textual ainda não foi localizado.",
+
         debug: {
-          hasResult: !!data?.result,
-          hasChoices: Array.isArray(data?.result?.choices),
-          choicesLength:
-            data?.result?.choices?.length || 0
+          result: data?.result ?? null,
+          choice0: choice
         }
       });
     }
@@ -326,16 +370,14 @@ para a próxima etapa do atendimento.
     // =========================================================
     // SUCESSO
     // =========================================================
+
     console.log(
-      "Resposta extraída da IA:",
-      answer
+      "AI_TEXT=" +
+      JSON.stringify(answer)
     );
 
     return res.status(200).json({
       ok: true,
-
-      // Mantemos os três campos porque não vamos quebrar
-      // o frontend existente.
       message: answer,
       reply: answer,
       response: answer
@@ -343,8 +385,12 @@ para a próxima etapa do atendimento.
 
   } catch (error) {
     console.error(
-      "Erro interno /api/chat:",
-      error
+      "CHAT_ERROR=" +
+      (
+        error instanceof Error
+          ? error.stack || error.message
+          : String(error)
+      )
     );
 
     return res.status(500).json({
