@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
 
-  // Mantemos o GET para testar a API pelo navegador
+  // Teste simples pelo navegador
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
@@ -37,22 +37,29 @@ export default async function handler(req, res) {
       });
     }
 
-    const body =
-      typeof req.body === "string"
-        ? JSON.parse(req.body)
-        : req.body || {};
+    // =========================================================
+    // LEITURA DO BODY
+    // =========================================================
 
-    /*
-      Aceita:
-      {
-        "message": "Olá"
-      }
+    let body = {};
 
-      ou:
-      {
-        "messages": [...]
+    if (typeof req.body === "string") {
+      try {
+        body = JSON.parse(req.body);
+      } catch {
+        return res.status(400).json({
+          ok: false,
+          error: "INVALID_JSON",
+          message: "O corpo da requisição não contém JSON válido."
+        });
       }
-    */
+    } else {
+      body = req.body || {};
+    }
+
+    // =========================================================
+    // HISTÓRICO DA CONVERSA
+    // =========================================================
 
     let messages = [];
 
@@ -64,16 +71,26 @@ export default async function handler(req, res) {
             typeof item.content === "string" &&
             ["user", "assistant", "system"].includes(item.role)
         )
+        .map((item) => ({
+          role: item.role,
+          content: item.content.trim()
+        }))
+        .filter((item) => item.content)
         .slice(-24);
     }
 
+    // Compatibilidade com frontend que envia somente "message"
     if (!messages.length && typeof body.message === "string") {
-      messages = [
-        {
-          role: "user",
-          content: body.message
-        }
-      ];
+      const text = body.message.trim();
+
+      if (text) {
+        messages = [
+          {
+            role: "user",
+            content: text
+          }
+        ];
+      }
     }
 
     if (!messages.length) {
@@ -84,39 +101,81 @@ export default async function handler(req, res) {
       });
     }
 
-    // Instrução principal do agente
+    // =========================================================
+    // PERSONALIDADE / COMPORTAMENTO DO AGENTE
+    // =========================================================
+
     const systemPrompt = `
-Você é o agente virtual da Inkly Solutions.
+Você é o Agente Inkly, agente virtual da Inkly Solutions.
 
 Converse de maneira natural, humana, profissional e consultiva.
 
-Seu objetivo é entender o que a pessoa precisa antes de tentar encaminhá-la para uma solução.
+Seu objetivo principal é compreender o problema, necessidade ou objetivo
+da pessoa e ajudá-la durante a conversa.
 
-Não responda como um menu.
-Não use respostas engessadas.
-Não fique repetindo opções.
-Não invente informações.
-Não diga que é ChatGPT.
-Não diga que é um modelo de linguagem.
+REGRAS DE CONVERSA:
 
-Faça perguntas apenas quando forem necessárias para compreender a necessidade da pessoa.
+- Não responda como um menu.
+- Não use respostas engessadas.
+- Não fique repetindo opções.
+- Não transforme toda resposta em uma pergunta.
+- Não invente informações.
+- Não diga que é ChatGPT.
+- Não diga que é um modelo de linguagem.
+- Não diga que teve dificuldade para consultar informações apenas porque
+  não conhece algum detalhe.
+- Não encaminhe prematuramente a pessoa para um consultor.
+- Não interrompa uma conversa que ainda pode ser conduzida por você.
 
-Mantenha contexto durante a conversa e considere as mensagens anteriores.
+Converse considerando todo o histórico recebido.
 
-Quando apropriado, explique soluções da Inkly Solutions de forma clara e objetiva.
+Quando a pessoa apresentar um problema, primeiro procure compreender
+o contexto.
 
-Evite respostas excessivamente longas.
+Faça perguntas somente quando elas realmente ajudarem a entender melhor
+a situação.
 
-Se a pessoa demonstrar intenção real de contratar, solicitar orçamento, falar com especialista ou continuar atendimento comercial, conduza naturalmente para a próxima etapa de atendimento.
+Quando já houver informações suficientes, dê uma orientação útil,
+explique possibilidades e avance naturalmente na conversa.
+
+A Inkly Solutions trabalha com soluções empresariais, melhoria de
+processos, operações, logística, melhoria contínua, Lean, treinamentos
+e soluções digitais.
+
+Quando o assunto envolver processos ou operações, você pode ajudar a
+identificar sintomas, possíveis gargalos, desperdícios, retrabalho,
+problemas de fluxo, organização, indicadores e oportunidades de melhoria.
+
+Não invente preços, prazos, contratos, clientes, resultados ou condições
+comerciais que não tenham sido fornecidos.
+
+Se não souber uma informação específica da empresa, diga isso de maneira
+natural e continue ajudando com aquilo que puder.
+
+Somente conduza para atendimento humano quando houver intenção concreta,
+como pedido de orçamento, contratação, reunião, proposta, contato com
+especialista ou quando realmente for necessária intervenção humana.
+
+As respostas devem ser claras, naturais e preferencialmente concisas.
 `.trim();
+
+    // Remove eventual system enviado pelo frontend para evitar
+    // múltiplas instruções de sistema conflitantes.
+    const conversationMessages = messages.filter(
+      (item) => item.role !== "system"
+    );
 
     const finalMessages = [
       {
         role: "system",
         content: systemPrompt
       },
-      ...messages
+      ...conversationMessages
     ];
+
+    // =========================================================
+    // CLOUDFLARE WORKERS AI
+    // =========================================================
 
     const endpoint =
       `https://api.cloudflare.com/client/v4/accounts/` +
@@ -137,45 +196,137 @@ Se a pessoa demonstrar intenção real de contratar, solicitar orçamento, falar
       })
     });
 
-    const data = await response.json();
+    // Primeiro lemos como texto.
+    // Isso evita perder a resposta caso a Cloudflare devolva
+    // algo inesperado.
+    const rawResponse = await response.text();
 
-    if (!response.ok) {
-      console.error("Cloudflare Workers AI:", data);
+    let data;
 
-      return res.status(response.status).json({
+    try {
+      data = JSON.parse(rawResponse);
+    } catch {
+      console.error(
+        "Cloudflare retornou resposta não JSON:",
+        rawResponse
+      );
+
+      return res.status(502).json({
         ok: false,
-        error: "CLOUDFLARE_AI_ERROR",
-        details: data
+        error: "INVALID_CLOUDFLARE_RESPONSE"
       });
     }
 
-    /*
-      Workers AI pode retornar a resposta em formatos
-      ligeiramente diferentes dependendo do modelo.
-    */
+    if (!response.ok || data?.success === false) {
+      console.error("Cloudflare Workers AI:", data);
 
-    const answer =
-      data?.result?.response ||
-      data?.result?.choices?.[0]?.message?.content ||
-      data?.result?.choices?.[0]?.text ||
-      data?.response ||
-      null;
+      return res.status(response.status || 502).json({
+        ok: false,
+        error: "CLOUDFLARE_AI_ERROR",
+        details: data?.errors || data
+      });
+    }
+
+    // =========================================================
+    // EXTRAÇÃO DA RESPOSTA DA IA
+    // =========================================================
+
+    function extractContent(content) {
+      if (typeof content === "string") {
+        return content.trim();
+      }
+
+      // Alguns modelos/APIs podem retornar content como array
+      if (Array.isArray(content)) {
+        return content
+          .map((part) => {
+            if (typeof part === "string") {
+              return part;
+            }
+
+            if (
+              part &&
+              typeof part === "object" &&
+              typeof part.text === "string"
+            ) {
+              return part.text;
+            }
+
+            return "";
+          })
+          .filter(Boolean)
+          .join("\n")
+          .trim();
+      }
+
+      // Outra possível estrutura
+      if (
+        content &&
+        typeof content === "object" &&
+        typeof content.text === "string"
+      ) {
+        return content.text.trim();
+      }
+
+      return "";
+    }
+
+    let answer = "";
+
+    // Formato Chat Completions:
+    // result.choices[0].message.content
+    const choice = data?.result?.choices?.[0];
+
+    if (choice?.message?.content !== undefined) {
+      answer = extractContent(choice.message.content);
+    }
+
+    // Algumas implementações usam text diretamente no choice
+    if (!answer && typeof choice?.text === "string") {
+      answer = choice.text.trim();
+    }
+
+    // Formato tradicional de alguns modelos Workers AI
+    if (!answer && data?.result?.response !== undefined) {
+      answer = extractContent(data.result.response);
+    }
+
+    // Outros formatos possíveis
+    if (!answer && data?.result?.output_text !== undefined) {
+      answer = extractContent(data.result.output_text);
+    }
+
+    if (!answer && data?.response !== undefined) {
+      answer = extractContent(data.response);
+    }
+
+    // =========================================================
+    // VALIDAÇÃO
+    // =========================================================
 
     if (!answer) {
-      console.error("Resposta inesperada Workers AI:", data);
+      console.error(
+        "Resposta inesperada Workers AI:",
+        JSON.stringify(data, null, 2)
+      );
 
       return res.status(502).json({
         ok: false,
         error: "INVALID_AI_RESPONSE",
-        details: data
+        message:
+          "A IA respondeu, mas o conteúdo da resposta não pôde ser interpretado."
       });
     }
+
+    // =========================================================
+    // RESPOSTA PARA O FRONTEND
+    // =========================================================
 
     return res.status(200).json({
       ok: true,
 
-      // Mais de um nome propositalmente:
-      // aumenta compatibilidade com o frontend existente.
+      // Mantemos os três nomes para compatibilidade
+      // com o frontend atual.
       message: answer,
       reply: answer,
       response: answer
