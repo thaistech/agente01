@@ -1,7 +1,9 @@
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
 
-  // Teste simples pelo navegador
+  // =========================================================
+  // GET — teste simples da rota
+  // =========================================================
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
@@ -21,6 +23,9 @@ export default async function handler(req, res) {
   }
 
   try {
+    // =========================================================
+    // CONFIGURAÇÃO
+    // =========================================================
     const ACCOUNT_ID = process.env.CF_ACCOUNT_ID;
     const API_TOKEN = process.env.CF_API_TOKEN;
 
@@ -38,9 +43,8 @@ export default async function handler(req, res) {
     }
 
     // =========================================================
-    // LEITURA DO BODY
+    // CORPO DA REQUISIÇÃO
     // =========================================================
-
     let body = {};
 
     if (typeof req.body === "string") {
@@ -60,7 +64,6 @@ export default async function handler(req, res) {
     // =========================================================
     // HISTÓRICO DA CONVERSA
     // =========================================================
-
     let messages = [];
 
     if (Array.isArray(body.messages)) {
@@ -79,18 +82,18 @@ export default async function handler(req, res) {
         .slice(-24);
     }
 
-    // Compatibilidade com frontend que envia somente "message"
-    if (!messages.length && typeof body.message === "string") {
-      const text = body.message.trim();
-
-      if (text) {
-        messages = [
-          {
-            role: "user",
-            content: text
-          }
-        ];
-      }
+    // Compatibilidade com frontend que manda apenas "message"
+    if (
+      !messages.length &&
+      typeof body.message === "string" &&
+      body.message.trim()
+    ) {
+      messages = [
+        {
+          role: "user",
+          content: body.message.trim()
+        }
+      ];
     }
 
     if (!messages.length) {
@@ -104,63 +107,48 @@ export default async function handler(req, res) {
     // =========================================================
     // PERSONALIDADE / COMPORTAMENTO DO AGENTE
     // =========================================================
-
     const systemPrompt = `
-Você é o Agente Inkly, agente virtual da Inkly Solutions.
+Você é o Agente Virtual da Inkly Solutions.
 
-Converse de maneira natural, humana, profissional e consultiva.
+Você atende pessoas interessadas nos serviços da Inkly Solutions.
 
-Seu objetivo principal é compreender o problema, necessidade ou objetivo
-da pessoa e ajudá-la durante a conversa.
+Converse como um atendente consultivo inteligente: natural, humano,
+profissional, cordial e objetivo.
+
+Sua prioridade é compreender a situação da pessoa antes de recomendar
+qualquer solução.
 
 REGRAS DE CONVERSA:
 
 - Não responda como um menu.
 - Não use respostas engessadas.
-- Não fique repetindo opções.
-- Não transforme toda resposta em uma pergunta.
-- Não invente informações.
+- Não repita frases desnecessariamente.
+- Não faça várias perguntas de uma vez sem necessidade.
+- Faça perguntas relevantes com base no que a pessoa acabou de dizer.
+- Considere todo o histórico recebido nesta conversa.
+- Não invente serviços, preços, prazos ou condições.
 - Não diga que é ChatGPT.
 - Não diga que é um modelo de linguagem.
-- Não diga que teve dificuldade para consultar informações apenas porque
-  não conhece algum detalhe.
-- Não encaminhe prematuramente a pessoa para um consultor.
-- Não interrompa uma conversa que ainda pode ser conduzida por você.
+- Não mencione Cloudflare, API, sistema interno ou implementação técnica.
+- Evite respostas excessivamente longas.
 
-Converse considerando todo o histórico recebido.
+Se a pessoa explicar um problema operacional, procure entender:
+processo afetado, sintomas, frequência, impacto e informações necessárias
+para identificar possíveis causas.
 
-Quando a pessoa apresentar um problema, primeiro procure compreender
-o contexto.
+Não tente vender imediatamente.
 
-Faça perguntas somente quando elas realmente ajudarem a entender melhor
-a situação.
+Primeiro compreenda.
+Depois oriente.
+Somente então, quando fizer sentido, relacione a necessidade aos serviços
+da Inkly Solutions.
 
-Quando já houver informações suficientes, dê uma orientação útil,
-explique possibilidades e avance naturalmente na conversa.
-
-A Inkly Solutions trabalha com soluções empresariais, melhoria de
-processos, operações, logística, melhoria contínua, Lean, treinamentos
-e soluções digitais.
-
-Quando o assunto envolver processos ou operações, você pode ajudar a
-identificar sintomas, possíveis gargalos, desperdícios, retrabalho,
-problemas de fluxo, organização, indicadores e oportunidades de melhoria.
-
-Não invente preços, prazos, contratos, clientes, resultados ou condições
-comerciais que não tenham sido fornecidos.
-
-Se não souber uma informação específica da empresa, diga isso de maneira
-natural e continue ajudando com aquilo que puder.
-
-Somente conduza para atendimento humano quando houver intenção concreta,
-como pedido de orçamento, contratação, reunião, proposta, contato com
-especialista ou quando realmente for necessária intervenção humana.
-
-As respostas devem ser claras, naturais e preferencialmente concisas.
+Se a pessoa demonstrar intenção clara de contratar, solicitar orçamento,
+falar com especialista ou avançar comercialmente, conduza naturalmente
+para a próxima etapa do atendimento.
 `.trim();
 
-    // Remove eventual system enviado pelo frontend para evitar
-    // múltiplas instruções de sistema conflitantes.
+    // Remove system antigo enviado pelo frontend para não duplicar instruções
     const conversationMessages = messages.filter(
       (item) => item.role !== "system"
     );
@@ -176,7 +164,6 @@ As respostas devem ser claras, naturais e preferencialmente concisas.
     // =========================================================
     // CLOUDFLARE WORKERS AI
     // =========================================================
-
     const endpoint =
       `https://api.cloudflare.com/client/v4/accounts/` +
       `${ACCOUNT_ID}/ai/run/${MODEL}`;
@@ -196,117 +183,129 @@ As respostas devem ser claras, naturais e preferencialmente concisas.
       })
     });
 
-    // Primeiro lemos como texto.
-    // Isso evita perder a resposta caso a Cloudflare devolva
-    // algo inesperado.
-    const rawResponse = await response.text();
+    const rawText = await response.text();
 
     let data;
 
     try {
-      data = JSON.parse(rawResponse);
+      data = JSON.parse(rawText);
     } catch {
       console.error(
-        "Cloudflare retornou resposta não JSON:",
-        rawResponse
+        "Cloudflare retornou conteúdo não JSON:",
+        rawText
       );
 
       return res.status(502).json({
         ok: false,
-        error: "INVALID_CLOUDFLARE_RESPONSE"
+        error: "INVALID_CLOUDFLARE_JSON"
       });
     }
 
-    if (!response.ok || data?.success === false) {
-      console.error("Cloudflare Workers AI:", data);
+    // Log completo — não transforma objetos internos em [Object]
+    console.log(
+      "Workers AI resposta completa:",
+      JSON.stringify(data, null, 2)
+    );
 
-      return res.status(response.status || 502).json({
+    if (!response.ok) {
+      console.error(
+        "Erro Cloudflare Workers AI:",
+        JSON.stringify(data, null, 2)
+      );
+
+      return res.status(response.status).json({
         ok: false,
         error: "CLOUDFLARE_AI_ERROR",
-        details: data?.errors || data
+        details: data
       });
     }
 
     // =========================================================
-    // EXTRAÇÃO DA RESPOSTA DA IA
+    // EXTRAÇÃO DA RESPOSTA
+    // =========================================================
+    // O glm-4.7-flash está retornando estrutura chat.completion.
+    // Esta função aceita diferentes formatos para não ficarmos
+    // presos a uma única estrutura do provider.
     // =========================================================
 
-    function extractContent(content) {
-      if (typeof content === "string") {
-        return content.trim();
+    function extractText(payload) {
+      const candidates = [
+        payload?.result?.response,
+
+        payload?.result?.choices?.[0]?.message?.content,
+
+        payload?.result?.choices?.[0]?.message?.text,
+
+        payload?.result?.choices?.[0]?.text,
+
+        payload?.result?.choices?.[0]?.content,
+
+        payload?.result?.choices?.[0]?.response,
+
+        payload?.response,
+
+        payload?.choices?.[0]?.message?.content,
+
+        payload?.choices?.[0]?.message?.text,
+
+        payload?.choices?.[0]?.text,
+
+        payload?.choices?.[0]?.content
+      ];
+
+      for (const candidate of candidates) {
+        if (
+          typeof candidate === "string" &&
+          candidate.trim()
+        ) {
+          return candidate.trim();
+        }
+
+        // Alguns providers podem devolver content como array
+        if (Array.isArray(candidate)) {
+          const text = candidate
+            .map((part) => {
+              if (typeof part === "string") {
+                return part;
+              }
+
+              if (
+                part &&
+                typeof part.text === "string"
+              ) {
+                return part.text;
+              }
+
+              if (
+                part &&
+                typeof part.content === "string"
+              ) {
+                return part.content;
+              }
+
+              return "";
+            })
+            .filter(Boolean)
+            .join("\n")
+            .trim();
+
+          if (text) {
+            return text;
+          }
+        }
       }
 
-      // Alguns modelos/APIs podem retornar content como array
-      if (Array.isArray(content)) {
-        return content
-          .map((part) => {
-            if (typeof part === "string") {
-              return part;
-            }
-
-            if (
-              part &&
-              typeof part === "object" &&
-              typeof part.text === "string"
-            ) {
-              return part.text;
-            }
-
-            return "";
-          })
-          .filter(Boolean)
-          .join("\n")
-          .trim();
-      }
-
-      // Outra possível estrutura
-      if (
-        content &&
-        typeof content === "object" &&
-        typeof content.text === "string"
-      ) {
-        return content.text.trim();
-      }
-
-      return "";
+      return null;
     }
 
-    let answer = "";
-
-    // Formato Chat Completions:
-    // result.choices[0].message.content
-    const choice = data?.result?.choices?.[0];
-
-    if (choice?.message?.content !== undefined) {
-      answer = extractContent(choice.message.content);
-    }
-
-    // Algumas implementações usam text diretamente no choice
-    if (!answer && typeof choice?.text === "string") {
-      answer = choice.text.trim();
-    }
-
-    // Formato tradicional de alguns modelos Workers AI
-    if (!answer && data?.result?.response !== undefined) {
-      answer = extractContent(data.result.response);
-    }
-
-    // Outros formatos possíveis
-    if (!answer && data?.result?.output_text !== undefined) {
-      answer = extractContent(data.result.output_text);
-    }
-
-    if (!answer && data?.response !== undefined) {
-      answer = extractContent(data.response);
-    }
+    const answer = extractText(data);
 
     // =========================================================
-    // VALIDAÇÃO
+    // RESPOSTA NÃO ENCONTRADA
     // =========================================================
-
     if (!answer) {
       console.error(
-        "Resposta inesperada Workers AI:",
+        "Não foi possível extrair texto da resposta Workers AI:",
         JSON.stringify(data, null, 2)
       );
 
@@ -314,26 +313,39 @@ As respostas devem ser claras, naturais e preferencialmente concisas.
         ok: false,
         error: "INVALID_AI_RESPONSE",
         message:
-          "A IA respondeu, mas o conteúdo da resposta não pôde ser interpretado."
+          "A IA respondeu, mas o conteúdo textual não foi localizado.",
+        debug: {
+          hasResult: !!data?.result,
+          hasChoices: Array.isArray(data?.result?.choices),
+          choicesLength:
+            data?.result?.choices?.length || 0
+        }
       });
     }
 
     // =========================================================
-    // RESPOSTA PARA O FRONTEND
+    // SUCESSO
     // =========================================================
+    console.log(
+      "Resposta extraída da IA:",
+      answer
+    );
 
     return res.status(200).json({
       ok: true,
 
-      // Mantemos os três nomes para compatibilidade
-      // com o frontend atual.
+      // Mantemos os três campos porque não vamos quebrar
+      // o frontend existente.
       message: answer,
       reply: answer,
       response: answer
     });
 
   } catch (error) {
-    console.error("Erro /api/chat:", error);
+    console.error(
+      "Erro interno /api/chat:",
+      error
+    );
 
     return res.status(500).json({
       ok: false,
